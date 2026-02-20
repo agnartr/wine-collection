@@ -6,6 +6,7 @@ const API_BASE = '/api';
 let wines = [];
 let currentFilters = {};
 let editingWineId = null;
+let pendingWineData = null;  // Store wine data when waiting for clarification or duplicate decision
 
 // DOM Elements
 const elements = {
@@ -20,11 +21,14 @@ const elements = {
     drinkingNowFilter: document.getElementById('drinking-now-filter'),
     sortSelect: document.getElementById('sort-select'),
     addWineBtn: document.getElementById('add-wine-btn'),
+    drinkWineBtn: document.getElementById('drink-wine-btn'),
     wineModal: document.getElementById('wine-modal'),
     viewModal: document.getElementById('view-modal'),
+    drinkModal: document.getElementById('drink-modal'),
     modalTitle: document.getElementById('modal-title'),
     closeModal: document.getElementById('close-modal'),
     closeViewModal: document.getElementById('close-view-modal'),
+    closeDrinkModal: document.getElementById('close-drink-modal'),
     cancelBtn: document.getElementById('cancel-btn'),
     wineForm: document.getElementById('wine-form'),
     imageInput: document.getElementById('image-input'),
@@ -33,7 +37,26 @@ const elements = {
     uploadSection: document.getElementById('upload-section'),
     analyzingIndicator: document.getElementById('analyzing'),
     viewBody: document.getElementById('view-body'),
-    viewTitle: document.getElementById('view-title')
+    viewTitle: document.getElementById('view-title'),
+    // New elements
+    clarificationSection: document.getElementById('clarification-section'),
+    clarificationQuestions: document.getElementById('clarification-questions'),
+    submitClarification: document.getElementById('submit-clarification'),
+    duplicateAlert: document.getElementById('duplicate-alert'),
+    duplicateInfo: document.getElementById('duplicate-info'),
+    addToQuantity: document.getElementById('add-to-quantity'),
+    addAsNew: document.getElementById('add-as-new'),
+    // Drink modal elements
+    drinkImageInput: document.getElementById('drink-image-input'),
+    drinkUploadArea: document.getElementById('drink-upload-area'),
+    drinkPreviewImage: document.getElementById('drink-preview-image'),
+    drinkUploadPrompt: document.getElementById('drink-upload-prompt'),
+    drinkAnalyzing: document.getElementById('drink-analyzing'),
+    drinkResult: document.getElementById('drink-result'),
+    drinkSuccess: document.getElementById('drink-success'),
+    drinkError: document.getElementById('drink-error'),
+    drinkMessage: document.getElementById('drink-message'),
+    drinkErrorMessage: document.getElementById('drink-error-message')
 };
 
 // Initialize
@@ -54,14 +77,20 @@ function setupEventListeners() {
 
     // Modal controls
     elements.addWineBtn.addEventListener('click', openAddModal);
+    elements.drinkWineBtn.addEventListener('click', openDrinkModal);
     elements.closeModal.addEventListener('click', closeModal);
     elements.closeViewModal.addEventListener('click', closeViewModal);
+    elements.closeDrinkModal.addEventListener('click', closeDrinkModal);
     elements.cancelBtn.addEventListener('click', closeModal);
+
     elements.wineModal.addEventListener('click', (e) => {
         if (e.target === elements.wineModal) closeModal();
     });
     elements.viewModal.addEventListener('click', (e) => {
         if (e.target === elements.viewModal) closeViewModal();
+    });
+    elements.drinkModal.addEventListener('click', (e) => {
+        if (e.target === elements.drinkModal) closeDrinkModal();
     });
 
     // Form submission
@@ -69,6 +98,16 @@ function setupEventListeners() {
 
     // Image upload
     elements.imageInput.addEventListener('change', handleImageUpload);
+
+    // Clarification
+    elements.submitClarification.addEventListener('click', handleClarificationSubmit);
+
+    // Duplicate handling
+    elements.addToQuantity.addEventListener('click', handleAddToQuantity);
+    elements.addAsNew.addEventListener('click', handleAddAsNew);
+
+    // Drink image upload
+    elements.drinkImageInput.addEventListener('change', handleDrinkImageUpload);
 }
 
 // API Functions
@@ -141,6 +180,17 @@ async function analyzeImage(file) {
         body: formData
     });
     if (!response.ok) throw new Error('Failed to analyze image');
+    return response.json();
+}
+
+async function drinkWine(file) {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const response = await fetch(`${API_BASE}/drink`, {
+        method: 'POST',
+        body: formData
+    });
     return response.json();
 }
 
@@ -281,6 +331,7 @@ function renderWineDetails(wine) {
 // Modal Functions
 function openAddModal() {
     editingWineId = null;
+    pendingWineData = null;
     elements.modalTitle.textContent = 'Add Wine';
     elements.wineForm.reset();
     document.getElementById('wine-id').value = '';
@@ -289,11 +340,14 @@ function openAddModal() {
     elements.previewImage.src = '';
     document.querySelector('.upload-prompt').classList.remove('hidden');
     elements.uploadSection.classList.remove('hidden');
+    elements.clarificationSection.classList.add('hidden');
+    elements.duplicateAlert.classList.add('hidden');
     elements.wineModal.classList.add('active');
 }
 
 function openEditModal(wine) {
     editingWineId = wine.id;
+    pendingWineData = null;
     elements.modalTitle.textContent = 'Edit Wine';
 
     // Fill form
@@ -330,12 +384,17 @@ function openEditModal(wine) {
     }
 
     elements.uploadSection.classList.remove('hidden');
+    elements.clarificationSection.classList.add('hidden');
+    elements.duplicateAlert.classList.add('hidden');
     elements.wineModal.classList.add('active');
 }
 
 function closeModal() {
     elements.wineModal.classList.remove('active');
     editingWineId = null;
+    pendingWineData = null;
+    elements.clarificationSection.classList.add('hidden');
+    elements.duplicateAlert.classList.add('hidden');
 }
 
 function openViewModal(wineId) {
@@ -349,6 +408,22 @@ function openViewModal(wineId) {
 
 function closeViewModal() {
     elements.viewModal.classList.remove('active');
+}
+
+function openDrinkModal() {
+    elements.drinkPreviewImage.classList.add('hidden');
+    elements.drinkPreviewImage.src = '';
+    elements.drinkUploadPrompt.classList.remove('hidden');
+    elements.drinkAnalyzing.classList.add('hidden');
+    elements.drinkResult.classList.add('hidden');
+    elements.drinkSuccess.classList.remove('hidden');
+    elements.drinkError.classList.add('hidden');
+    elements.drinkImageInput.value = '';
+    elements.drinkModal.classList.add('active');
+}
+
+function closeDrinkModal() {
+    elements.drinkModal.classList.remove('active');
 }
 
 // Form Handling
@@ -407,6 +482,10 @@ async function handleImageUpload(e) {
     };
     reader.readAsDataURL(file);
 
+    // Hide previous alerts
+    elements.clarificationSection.classList.add('hidden');
+    elements.duplicateAlert.classList.add('hidden');
+
     // Analyze with AI
     elements.analyzingIndicator.classList.remove('hidden');
     try {
@@ -419,32 +498,179 @@ async function handleImageUpload(e) {
             return;
         }
 
+        // Store the result for later use
+        pendingWineData = result;
+
+        // Check if clarification is needed
+        if (result.needs_clarification && result.clarification_questions?.length > 0) {
+            showClarificationQuestions(result.clarification_questions);
+            fillFormWithResult(result);
+            elements.analyzingIndicator.classList.add('hidden');
+            return;
+        }
+
+        // Check if this is a duplicate
+        if (result.is_duplicate && result.existing_wine) {
+            showDuplicateAlert(result.existing_wine);
+            fillFormWithResult(result);
+            elements.analyzingIndicator.classList.add('hidden');
+            return;
+        }
+
         // Fill form with results
-        if (result.name) document.getElementById('wine-name').value = result.name;
-        if (result.producer) document.getElementById('wine-producer').value = result.producer;
-        if (result.vintage) document.getElementById('wine-vintage').value = result.vintage;
-        if (result.style) document.getElementById('wine-style').value = result.style;
-        if (result.country) document.getElementById('wine-country').value = result.country;
-        if (result.region) document.getElementById('wine-region').value = result.region;
-        if (result.appellation) document.getElementById('wine-appellation').value = result.appellation;
-        if (result.grape_varieties?.length) {
-            document.getElementById('wine-grapes').value = result.grape_varieties.join(', ');
-        }
-        if (result.alcohol_percentage) document.getElementById('wine-alcohol').value = result.alcohol_percentage;
-        if (result.drinking_window_start) document.getElementById('wine-drink-start').value = result.drinking_window_start;
-        if (result.drinking_window_end) document.getElementById('wine-drink-end').value = result.drinking_window_end;
-        if (result.score) document.getElementById('wine-score').value = result.score;
-        if (result.description) document.getElementById('wine-description').value = result.description;
-        if (result.tasting_notes) {
-            document.getElementById('wine-tasting-notes').value = formatTastingNotesForEdit(result.tasting_notes);
-        }
-        if (result.image_path) document.getElementById('image-path').value = result.image_path;
+        fillFormWithResult(result);
 
     } catch (error) {
         console.error('Error analyzing image:', error);
         showError('Failed to analyze image. You can still fill in the details manually.');
     } finally {
         elements.analyzingIndicator.classList.add('hidden');
+    }
+}
+
+function fillFormWithResult(result) {
+    if (result.name) document.getElementById('wine-name').value = result.name;
+    if (result.producer) document.getElementById('wine-producer').value = result.producer;
+    if (result.vintage) document.getElementById('wine-vintage').value = result.vintage;
+    if (result.style) document.getElementById('wine-style').value = result.style;
+    if (result.country) document.getElementById('wine-country').value = result.country;
+    if (result.region) document.getElementById('wine-region').value = result.region;
+    if (result.appellation) document.getElementById('wine-appellation').value = result.appellation;
+    if (result.grape_varieties?.length) {
+        document.getElementById('wine-grapes').value = result.grape_varieties.join(', ');
+    }
+    if (result.alcohol_percentage) document.getElementById('wine-alcohol').value = result.alcohol_percentage;
+    if (result.drinking_window_start) document.getElementById('wine-drink-start').value = result.drinking_window_start;
+    if (result.drinking_window_end) document.getElementById('wine-drink-end').value = result.drinking_window_end;
+    if (result.score) document.getElementById('wine-score').value = result.score;
+    if (result.description) document.getElementById('wine-description').value = result.description;
+    if (result.tasting_notes) {
+        document.getElementById('wine-tasting-notes').value = formatTastingNotesForEdit(result.tasting_notes);
+    }
+    if (result.image_path) document.getElementById('image-path').value = result.image_path;
+}
+
+function showClarificationQuestions(questions) {
+    elements.clarificationQuestions.innerHTML = questions.map((q, i) => {
+        // Check if it's a style question
+        if (q.toLowerCase().includes('red') && q.toLowerCase().includes('white')) {
+            return `
+                <div class="clarification-question">
+                    <label>${escapeHtml(q)}</label>
+                    <select id="clarification-${i}" data-field="style">
+                        <option value="">Select...</option>
+                        <option value="Red">Red</option>
+                        <option value="White">White</option>
+                        <option value="Rosé">Rosé</option>
+                        <option value="Sparkling">Sparkling</option>
+                    </select>
+                </div>
+            `;
+        }
+        return `
+            <div class="clarification-question">
+                <label>${escapeHtml(q)}</label>
+                <input type="text" id="clarification-${i}">
+            </div>
+        `;
+    }).join('');
+    elements.clarificationSection.classList.remove('hidden');
+}
+
+function handleClarificationSubmit() {
+    // Get answers and update form
+    const selects = elements.clarificationQuestions.querySelectorAll('select');
+    selects.forEach(select => {
+        const field = select.dataset.field;
+        if (field && select.value) {
+            document.getElementById(`wine-${field}`).value = select.value;
+        }
+    });
+
+    elements.clarificationSection.classList.add('hidden');
+}
+
+function showDuplicateAlert(existingWine) {
+    elements.duplicateInfo.innerHTML = `
+        <strong>${escapeHtml(existingWine.name)}</strong>
+        ${existingWine.vintage ? `(${existingWine.vintage})` : ''}<br>
+        Currently: ${existingWine.quantity || 0} bottles in collection
+    `;
+    elements.duplicateAlert.classList.remove('hidden');
+}
+
+async function handleAddToQuantity() {
+    if (!pendingWineData?.existing_wine) return;
+
+    const existingWine = pendingWineData.existing_wine;
+    const quantityToAdd = parseInt(document.getElementById('wine-quantity').value) || 1;
+
+    try {
+        await updateWine(existingWine.id, {
+            quantity: (existingWine.quantity || 0) + quantityToAdd
+        });
+        closeModal();
+        loadWines();
+        loadStats();
+    } catch (error) {
+        console.error('Error updating quantity:', error);
+        showError('Failed to update quantity');
+    }
+}
+
+function handleAddAsNew() {
+    // Just hide the alert and let user save as new wine
+    elements.duplicateAlert.classList.add('hidden');
+    pendingWineData = null;
+}
+
+// Drink functionality
+async function handleDrinkImageUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        elements.drinkPreviewImage.src = e.target.result;
+        elements.drinkPreviewImage.classList.remove('hidden');
+        elements.drinkUploadPrompt.classList.add('hidden');
+    };
+    reader.readAsDataURL(file);
+
+    // Show analyzing
+    elements.drinkAnalyzing.classList.remove('hidden');
+    elements.drinkResult.classList.add('hidden');
+
+    try {
+        const result = await drinkWine(file);
+
+        elements.drinkAnalyzing.classList.add('hidden');
+        elements.drinkResult.classList.remove('hidden');
+
+        if (result.error) {
+            elements.drinkSuccess.classList.add('hidden');
+            elements.drinkError.classList.remove('hidden');
+            elements.drinkErrorMessage.textContent = result.error;
+            if (result.identified) {
+                elements.drinkErrorMessage.textContent += ` (Identified: ${result.identified.name || 'Unknown'})`;
+            }
+        } else {
+            elements.drinkSuccess.classList.remove('hidden');
+            elements.drinkError.classList.add('hidden');
+            elements.drinkMessage.textContent = result.message;
+            // Reload wines after drinking
+            loadWines();
+            loadStats();
+        }
+
+    } catch (error) {
+        console.error('Error drinking wine:', error);
+        elements.drinkAnalyzing.classList.add('hidden');
+        elements.drinkResult.classList.remove('hidden');
+        elements.drinkSuccess.classList.add('hidden');
+        elements.drinkError.classList.remove('hidden');
+        elements.drinkErrorMessage.textContent = 'Failed to process image';
     }
 }
 

@@ -6,7 +6,7 @@ from pathlib import Path
 from flask import Flask, request, jsonify, render_template, send_from_directory
 
 import database
-from wine_analyzer import analyze_wine_image, validate_wine_data
+from wine_analyzer import analyze_wine_image, identify_wine_image, validate_wine_data
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max upload
@@ -165,7 +165,81 @@ def analyze_image():
     # Add the image path to the result
     cleaned["image_path"] = image_path
 
+    # Check if this wine already exists in the database
+    if not cleaned.get("error") and not cleaned.get("needs_clarification"):
+        existing = database.find_matching_wine(
+            name=cleaned.get("name"),
+            producer=cleaned.get("producer"),
+            vintage=cleaned.get("vintage")
+        )
+        if existing:
+            cleaned["existing_wine"] = existing
+            cleaned["is_duplicate"] = True
+
     return jsonify(cleaned)
+
+
+@app.route("/api/drink", methods=["POST"])
+def drink_wine():
+    """Identify a wine from photo and reduce quantity by 1."""
+    if "image" not in request.files:
+        return jsonify({"error": "No image file provided"}), 400
+
+    file = request.files["image"]
+    if file.filename == "":
+        return jsonify({"error": "No file selected"}), 400
+
+    if not allowed_file(file.filename):
+        return jsonify({"error": "Invalid file type. Allowed: png, jpg, jpeg, gif, webp"}), 400
+
+    # Save the file temporarily
+    image_path = save_uploaded_file(file)
+    if not image_path:
+        return jsonify({"error": "Failed to save image"}), 500
+
+    # Identify the wine
+    full_path = Path(__file__).parent / "static" / image_path
+    result = identify_wine_image(image_path=str(full_path))
+
+    # Clean up the temp image
+    try:
+        full_path.unlink()
+    except OSError:
+        pass
+
+    if result.get("error"):
+        return jsonify(result), 400
+
+    # Find matching wine in database
+    existing = database.find_matching_wine(
+        name=result.get("name"),
+        producer=result.get("producer"),
+        vintage=result.get("vintage")
+    )
+
+    if not existing:
+        return jsonify({
+            "error": "Wine not found in collection",
+            "identified": result
+        }), 404
+
+    # Check if there's any quantity left
+    if existing.get("quantity", 0) <= 0:
+        return jsonify({
+            "error": "No bottles left of this wine",
+            "wine": existing
+        }), 400
+
+    # Reduce quantity by 1
+    database.increment_wine_quantity(existing["id"], -1)
+    updated_wine = database.get_wine(existing["id"])
+
+    return jsonify({
+        "message": f"Enjoyed a bottle of {existing['name']}!",
+        "wine": updated_wine,
+        "previous_quantity": existing["quantity"],
+        "new_quantity": updated_wine["quantity"]
+    })
 
 
 @app.route("/api/stats", methods=["GET"])

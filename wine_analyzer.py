@@ -43,7 +43,9 @@ Return a JSON object with the following fields (use null for any fields you cann
         "tannins": "Low|Medium|High",  // For reds
         "acidity": "Low|Medium|High",
         "finish": "Short|Medium|Long"
-    }
+    },
+    "needs_clarification": false,  // Set to true if you're uncertain about key details
+    "clarification_questions": []  // Array of questions if uncertain, e.g. ["Is this wine red or white?"]
 }
 
 Important guidelines:
@@ -51,6 +53,23 @@ Important guidelines:
 - For drinking windows, consider the wine style, region, and vintage quality
 - For scores, be conservative and base it on typical quality for the producer/region
 - If the image is not a wine bottle or label, return {"error": "Not a wine label image"}
+- IMPORTANT: If you cannot clearly determine the wine style (red/white/rosé) from the image, or if the producer makes both red and white versions of a wine with similar labels, set "needs_clarification": true and add a question like "Is this wine red or white?" to clarification_questions
+- If you're uncertain about any critical field (style, vintage, producer), ask for clarification rather than guessing
+
+Return ONLY the JSON object, no additional text."""
+
+
+IDENTIFY_PROMPT = """Look at this wine bottle image and identify the wine.
+
+Return a JSON object with just the key identifying information:
+
+{
+    "name": "Full wine name",
+    "producer": "Winery/Producer name",
+    "vintage": 2020  // Year as integer, or null if non-vintage
+}
+
+If you cannot identify the wine, return {"error": "Cannot identify wine"}
 
 Return ONLY the JSON object, no additional text."""
 
@@ -141,6 +160,81 @@ def analyze_wine_image(image_path=None, image_base64=None, media_type="image/jpe
 
     except json.JSONDecodeError as e:
         return {"error": f"Failed to parse AI response: {str(e)}", "raw_response": response_text}
+    except Exception as e:
+        return {"error": f"API error: {str(e)}"}
+
+
+def identify_wine_image(image_path=None, image_base64=None, media_type="image/jpeg"):
+    """
+    Identify a wine from a bottle image (for drink/find operations).
+    Returns just name, producer, vintage for matching.
+    """
+    if not image_path and not image_base64:
+        return {"error": "No image provided"}
+
+    if image_path and not image_base64:
+        try:
+            with open(image_path, "rb") as f:
+                image_base64 = base64.standard_b64encode(f.read()).decode("utf-8")
+            ext = os.path.splitext(image_path)[1].lower()
+            media_types = {
+                ".jpg": "image/jpeg",
+                ".jpeg": "image/jpeg",
+                ".png": "image/png",
+                ".gif": "image/gif",
+                ".webp": "image/webp"
+            }
+            media_type = media_types.get(ext, "image/jpeg")
+        except FileNotFoundError:
+            return {"error": f"Image file not found: {image_path}"}
+        except Exception as e:
+            return {"error": f"Error reading image: {str(e)}"}
+
+    try:
+        client = get_client()
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=500,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": media_type,
+                                "data": image_base64
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "text": IDENTIFY_PROMPT
+                        }
+                    ]
+                }
+            ]
+        )
+
+        response_text = response.content[0].text.strip()
+        if response_text.startswith("```"):
+            lines = response_text.split("\n")
+            json_lines = []
+            in_json = False
+            for line in lines:
+                if line.startswith("```") and not in_json:
+                    in_json = True
+                    continue
+                elif line.startswith("```") and in_json:
+                    break
+                elif in_json:
+                    json_lines.append(line)
+            response_text = "\n".join(json_lines)
+
+        return json.loads(response_text)
+
+    except json.JSONDecodeError as e:
+        return {"error": f"Failed to parse AI response: {str(e)}"}
     except Exception as e:
         return {"error": f"API error: {str(e)}"}
 
@@ -244,5 +338,13 @@ def validate_wine_data(data):
         cleaned["tasting_notes"] = notes
     else:
         cleaned["tasting_notes"] = {}
+
+    # Clarification fields
+    cleaned["needs_clarification"] = bool(data.get("needs_clarification", False))
+    questions = data.get("clarification_questions", [])
+    if isinstance(questions, list):
+        cleaned["clarification_questions"] = [str(q) for q in questions if q]
+    else:
+        cleaned["clarification_questions"] = []
 
     return cleaned

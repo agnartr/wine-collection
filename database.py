@@ -281,5 +281,82 @@ def get_stats():
     return stats
 
 
+def find_matching_wine(name, producer=None, vintage=None):
+    """
+    Find a wine that matches the given criteria.
+    Returns the wine if found, None otherwise.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # Try exact match first
+    if producer and vintage:
+        cursor.execute("""
+            SELECT * FROM wines
+            WHERE LOWER(name) = LOWER(?)
+            AND LOWER(producer) = LOWER(?)
+            AND vintage = ?
+        """, (name, producer, vintage))
+        row = cursor.fetchone()
+        if row:
+            conn.close()
+            return row_to_dict(row)
+
+    # Try name + vintage
+    if vintage:
+        cursor.execute("""
+            SELECT * FROM wines
+            WHERE LOWER(name) = LOWER(?)
+            AND vintage = ?
+        """, (name, vintage))
+        row = cursor.fetchone()
+        if row:
+            conn.close()
+            return row_to_dict(row)
+
+    # Try name + producer
+    if producer:
+        cursor.execute("""
+            SELECT * FROM wines
+            WHERE LOWER(name) = LOWER(?)
+            AND LOWER(producer) = LOWER(?)
+        """, (name, producer))
+        row = cursor.fetchone()
+        if row:
+            conn.close()
+            return row_to_dict(row)
+
+    # Try fuzzy match on name containing the search term
+    cursor.execute("""
+        SELECT * FROM wines
+        WHERE LOWER(name) LIKE LOWER(?)
+        ORDER BY
+            CASE WHEN vintage = ? THEN 0 ELSE 1 END,
+            created_at DESC
+        LIMIT 1
+    """, (f"%{name}%", vintage or 0))
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        return row_to_dict(row)
+    return None
+
+
+def increment_wine_quantity(wine_id, amount=1):
+    """Increment the quantity of a wine by the given amount."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE wines
+        SET quantity = quantity + ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+    """, (amount, wine_id))
+    success = cursor.rowcount > 0
+    conn.commit()
+    conn.close()
+    return success
+
+
 # Initialize database on module import
 init_db()

@@ -45,7 +45,10 @@
                     <option value="quantity-desc">Most Bottles</option>
                 </select>
             </div>
-            <button class="btn btn-primary" id="add-wine-btn">+ Add Wine</button>
+            <div class="button-group">
+                <button class="btn btn-primary" id="add-wine-btn">+ Add Wine</button>
+                <button class="btn btn-secondary" id="drink-wine-btn">🍷 Drink</button>
+            </div>
         </section>
 
         <section class="wine-grid" id="wine-grid">
@@ -74,6 +77,28 @@
                     <div class="analyzing hidden" id="analyzing">
                         <div class="spinner"></div>
                         <p>Analyzing wine label...</p>
+                    </div>
+                </div>
+
+                <!-- Clarification Section -->
+                <div class="clarification-section hidden" id="clarification-section">
+                    <div class="clarification-box">
+                        <h3>🤔 Need your help</h3>
+                        <p>The AI couldn't determine some details. Please answer:</p>
+                        <div id="clarification-questions"></div>
+                        <button type="button" class="btn btn-primary" id="submit-clarification">Continue</button>
+                    </div>
+                </div>
+
+                <!-- Duplicate Alert -->
+                <div class="duplicate-alert hidden" id="duplicate-alert">
+                    <div class="alert-box">
+                        <h3>🍷 Wine already in collection!</h3>
+                        <p id="duplicate-info"></p>
+                        <div class="alert-actions">
+                            <button type="button" class="btn btn-primary" id="add-to-quantity">Add to quantity</button>
+                            <button type="button" class="btn btn-secondary" id="add-as-new">Add as new wine</button>
+                        </div>
                     </div>
                 </div>
 
@@ -184,6 +209,41 @@
             </div>
             <div class="modal-body" id="view-body">
                 <!-- Wine details will be rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Drink Wine Modal -->
+    <div class="modal" id="drink-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🍷 Drink a Wine</h2>
+                <button class="close-btn" id="close-drink-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="upload-area" id="drink-upload-area">
+                    <input type="file" id="drink-image-input" accept="image/*" capture="environment">
+                    <div class="upload-prompt" id="drink-upload-prompt">
+                        <span class="upload-icon">📷</span>
+                        <p>Take a photo of the wine you're drinking</p>
+                        <p class="upload-hint">We'll find it and reduce the quantity</p>
+                    </div>
+                    <img id="drink-preview-image" class="preview-image hidden" alt="Wine preview">
+                </div>
+                <div class="analyzing hidden" id="drink-analyzing">
+                    <div class="spinner"></div>
+                    <p>Finding wine...</p>
+                </div>
+                <div class="drink-result hidden" id="drink-result">
+                    <div class="drink-success" id="drink-success">
+                        <span class="success-icon">🎉</span>
+                        <p id="drink-message"></p>
+                    </div>
+                    <div class="drink-error hidden" id="drink-error">
+                        <span class="error-icon">😕</span>
+                        <p id="drink-error-message"></p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
