@@ -179,10 +179,13 @@ def get_stats():
 def debug_env():
     """Debug endpoint to check environment."""
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    # List all env var names (not values for security)
+    all_env_keys = sorted([k for k in os.environ.keys()])
     return jsonify({
         "api_key_set": bool(api_key),
         "api_key_length": len(api_key),
-        "api_key_prefix": api_key[:20] + "..." if len(api_key) > 20 else "too short"
+        "api_key_prefix": api_key[:20] + "..." if len(api_key) > 20 else "too short",
+        "all_env_keys": all_env_keys
     })
 
 
