@@ -5,8 +5,6 @@ import sqlite3
 import json
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import urlparse
-
 # Check for PostgreSQL connection
 DATABASE_URL = os.environ.get("DATABASE_URL")
 USE_POSTGRES = DATABASE_URL is not None
@@ -22,15 +20,8 @@ SQLITE_PATH = Path(__file__).parent / "wines.db"
 def get_connection():
     """Get a database connection."""
     if USE_POSTGRES:
-        # Parse DATABASE_URL
-        url = urlparse(DATABASE_URL)
-        conn = psycopg2.connect(
-            host=url.hostname,
-            port=url.port,
-            database=url.path[1:],
-            user=url.username,
-            password=url.password
-        )
+        # Use DATABASE_URL directly
+        conn = psycopg2.connect(DATABASE_URL)
         return conn
     else:
         conn = sqlite3.connect(SQLITE_PATH)
