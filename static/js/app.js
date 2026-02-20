@@ -240,10 +240,21 @@ function renderWines() {
     });
 }
 
+function getImageUrl(imagePath) {
+    if (!imagePath) return null;
+    // If it's already a full URL (Cloudinary), use as-is
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+        return imagePath;
+    }
+    // Otherwise, it's a local path
+    return `/static/${imagePath}`;
+}
+
 function renderWineCard(wine) {
     const styleClass = wine.style ? `style-${wine.style.toLowerCase().replace('é', 'e')}` : '';
-    const imageHtml = wine.image_path
-        ? `<img src="/static/${wine.image_path}" alt="${escapeHtml(wine.name)}" class="wine-card-image">`
+    const imageUrl = getImageUrl(wine.image_path);
+    const imageHtml = imageUrl
+        ? `<img src="${imageUrl}" alt="${escapeHtml(wine.name)}" class="wine-card-image">`
         : `<div class="wine-card-placeholder">🍷</div>`;
 
     return `
@@ -271,8 +282,9 @@ function renderWineCard(wine) {
 }
 
 function renderWineDetails(wine) {
-    const imageHtml = wine.image_path
-        ? `<img src="/static/${wine.image_path}" alt="${escapeHtml(wine.name)}" class="view-wine-image">`
+    const imageUrl = getImageUrl(wine.image_path);
+    const imageHtml = imageUrl
+        ? `<img src="${imageUrl}" alt="${escapeHtml(wine.name)}" class="view-wine-image">`
         : '';
 
     const styleClass = wine.style ? `style-${wine.style.toLowerCase().replace('é', 'e')}` : '';
@@ -374,8 +386,9 @@ function openEditModal(wine) {
     document.getElementById('wine-tasting-notes').value = notesText;
 
     // Show preview image if exists
-    if (wine.image_path) {
-        elements.previewImage.src = `/static/${wine.image_path}`;
+    const imageUrl = getImageUrl(wine.image_path);
+    if (imageUrl) {
+        elements.previewImage.src = imageUrl;
         elements.previewImage.classList.remove('hidden');
         document.querySelector('.upload-prompt').classList.add('hidden');
     } else {

@@ -1,12 +1,22 @@
-"""Flask application for Wine Collection Manager."""
+"""Flask application for Agnar's Cellar."""
 
 import os
 import uuid
+import base64
 from pathlib import Path
 from flask import Flask, request, jsonify, render_template, send_from_directory
 
 import database
 from wine_analyzer import analyze_wine_image, identify_wine_image, validate_wine_data
+
+# Cloudinary configuration
+CLOUDINARY_URL = os.environ.get("CLOUDINARY_URL")
+USE_CLOUDINARY = CLOUDINARY_URL is not None
+
+if USE_CLOUDINARY:
+    import cloudinary
+    import cloudinary.uploader
+    cloudinary.config(cloudinary_url=CLOUDINARY_URL)
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max upload
@@ -21,18 +31,68 @@ def allowed_file(filename):
 
 
 def save_uploaded_file(file):
-    """Save uploaded file with unique name and return path."""
+    """Save uploaded file and return path/URL."""
     if not file or not file.filename:
-        return None
+        return None, None
 
     if not allowed_file(file.filename):
-        return None
+        return None, None
 
-    ext = file.filename.rsplit(".", 1)[1].lower()
-    filename = f"{uuid.uuid4()}.{ext}"
-    filepath = UPLOAD_FOLDER / filename
-    file.save(filepath)
-    return f"uploads/{filename}"
+    if USE_CLOUDINARY:
+        # Upload to Cloudinary
+        try:
+            result = cloudinary.uploader.upload(
+                file,
+                folder="wine-collection",
+                resource_type="image"
+            )
+            # Return (cloudinary_url, public_id)
+            return result["secure_url"], result["public_id"]
+        except Exception as e:
+            print(f"Cloudinary upload error: {e}")
+            return None, None
+    else:
+        # Save locally
+        ext = file.filename.rsplit(".", 1)[1].lower()
+        filename = f"{uuid.uuid4()}.{ext}"
+        filepath = UPLOAD_FOLDER / filename
+        file.save(filepath)
+        return f"uploads/{filename}", None
+
+
+def get_image_for_analysis(file):
+    """Get image data for AI analysis. Returns (base64_data, media_type, temp_path)."""
+    if not file:
+        return None, None, None
+
+    # Read file content
+    content = file.read()
+    file.seek(0)  # Reset for potential re-read
+
+    # Determine media type
+    ext = file.filename.rsplit(".", 1)[1].lower() if file.filename else "jpg"
+    media_types = {
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "png": "image/png",
+        "gif": "image/gif",
+        "webp": "image/webp"
+    }
+    media_type = media_types.get(ext, "image/jpeg")
+
+    # Encode to base64
+    b64_data = base64.standard_b64encode(content).decode("utf-8")
+
+    return b64_data, media_type, None
+
+
+def delete_cloudinary_image(public_id):
+    """Delete an image from Cloudinary."""
+    if USE_CLOUDINARY and public_id:
+        try:
+            cloudinary.uploader.destroy(public_id)
+        except Exception as e:
+            print(f"Cloudinary delete error: {e}")
 
 
 # Routes
@@ -46,7 +106,7 @@ def index():
 
 @app.route("/static/uploads/<path:filename>")
 def serve_upload(filename):
-    """Serve uploaded files."""
+    """Serve uploaded files (only used when not using Cloudinary)."""
     return send_from_directory(UPLOAD_FOLDER, filename)
 
 
@@ -121,14 +181,17 @@ def delete_wine(wine_id):
     if not wine:
         return jsonify({"error": "Wine not found"}), 404
 
-    # Delete the image file if it exists
+    # Delete the image
     if wine.get("image_path"):
-        image_file = Path(__file__).parent / "static" / wine["image_path"]
-        if image_file.exists():
-            try:
-                image_file.unlink()
-            except OSError:
-                pass  # Ignore deletion errors
+        if USE_CLOUDINARY and wine.get("cloudinary_id"):
+            delete_cloudinary_image(wine["cloudinary_id"])
+        elif not USE_CLOUDINARY:
+            image_file = Path(__file__).parent / "static" / wine["image_path"]
+            if image_file.exists():
+                try:
+                    image_file.unlink()
+                except OSError:
+                    pass
 
     success = database.delete_wine(wine_id)
     if not success:
@@ -150,20 +213,25 @@ def analyze_image():
     if not allowed_file(file.filename):
         return jsonify({"error": "Invalid file type. Allowed: png, jpg, jpeg, gif, webp"}), 400
 
-    # Save the file
-    image_path = save_uploaded_file(file)
-    if not image_path:
-        return jsonify({"error": "Failed to save image"}), 500
+    # Get image data for analysis
+    b64_data, media_type, _ = get_image_for_analysis(file)
+    if not b64_data:
+        return jsonify({"error": "Failed to process image"}), 500
 
     # Analyze with Claude
-    full_path = Path(__file__).parent / "static" / image_path
-    result = analyze_wine_image(image_path=str(full_path))
+    result = analyze_wine_image(image_base64=b64_data, media_type=media_type)
 
     # Validate and clean the data
     cleaned = validate_wine_data(result)
 
-    # Add the image path to the result
-    cleaned["image_path"] = image_path
+    # Save the file (after analysis succeeds)
+    file.seek(0)  # Reset file pointer
+    image_url, cloudinary_id = save_uploaded_file(file)
+
+    if image_url:
+        cleaned["image_path"] = image_url
+        if cloudinary_id:
+            cleaned["cloudinary_id"] = cloudinary_id
 
     # Check if this wine already exists in the database
     if not cleaned.get("error") and not cleaned.get("needs_clarification"):
@@ -192,20 +260,13 @@ def drink_wine():
     if not allowed_file(file.filename):
         return jsonify({"error": "Invalid file type. Allowed: png, jpg, jpeg, gif, webp"}), 400
 
-    # Save the file temporarily
-    image_path = save_uploaded_file(file)
-    if not image_path:
-        return jsonify({"error": "Failed to save image"}), 500
+    # Get image data for analysis (don't save, just analyze)
+    b64_data, media_type, _ = get_image_for_analysis(file)
+    if not b64_data:
+        return jsonify({"error": "Failed to process image"}), 500
 
     # Identify the wine
-    full_path = Path(__file__).parent / "static" / image_path
-    result = identify_wine_image(image_path=str(full_path))
-
-    # Clean up the temp image
-    try:
-        full_path.unlink()
-    except OSError:
-        pass
+    result = identify_wine_image(image_base64=b64_data, media_type=media_type)
 
     if result.get("error"):
         return jsonify(result), 400
@@ -253,17 +314,14 @@ def get_stats():
 def debug_env():
     """Debug endpoint to check environment."""
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    # List all env var names (not values for security)
-    all_env_keys = sorted([k for k in os.environ.keys()])
     return jsonify({
         "api_key_set": bool(api_key),
-        "api_key_length": len(api_key),
-        "api_key_prefix": api_key[:20] + "..." if len(api_key) > 20 else "too short",
-        "all_env_keys": all_env_keys
+        "cloudinary_configured": USE_CLOUDINARY,
+        "database_type": "postgresql" if os.environ.get("DATABASE_URL") else "sqlite"
     })
 
 
-# Ensure upload directory exists on startup
+# Ensure upload directory exists on startup (for local dev)
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
 # Initialize database on startup

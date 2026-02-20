@@ -67,9 +67,19 @@ def init_db():
                 description TEXT,
                 tasting_notes TEXT,
                 image_path TEXT,
+                cloudinary_id TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
+        """)
+        # Add cloudinary_id column if it doesn't exist (for existing tables)
+        cursor.execute("""
+            DO $$
+            BEGIN
+                ALTER TABLE wines ADD COLUMN cloudinary_id TEXT;
+            EXCEPTION
+                WHEN duplicate_column THEN NULL;
+            END $$;
         """)
     else:
         cursor.execute("""
@@ -91,6 +101,7 @@ def init_db():
                 description TEXT,
                 tasting_notes TEXT,
                 image_path TEXT,
+                cloudinary_id TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -148,8 +159,8 @@ def create_wine(data):
                 name, producer, vintage, country, region, appellation,
                 style, grape_varieties, alcohol_percentage, quantity,
                 drinking_window_start, drinking_window_end, score,
-                description, tasting_notes, image_path
-            ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
+                description, tasting_notes, image_path, cloudinary_id
+            ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
             RETURNING id
         """, (
             data.get("name"),
@@ -167,7 +178,8 @@ def create_wine(data):
             data.get("score"),
             data.get("description"),
             tasting_notes,
-            data.get("image_path")
+            data.get("image_path"),
+            data.get("cloudinary_id")
         ))
         wine_id = cursor.fetchone()["id"]
     else:
@@ -176,8 +188,8 @@ def create_wine(data):
                 name, producer, vintage, country, region, appellation,
                 style, grape_varieties, alcohol_percentage, quantity,
                 drinking_window_start, drinking_window_end, score,
-                description, tasting_notes, image_path
-            ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
+                description, tasting_notes, image_path, cloudinary_id
+            ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
         """, (
             data.get("name"),
             data.get("producer"),
@@ -194,7 +206,8 @@ def create_wine(data):
             data.get("score"),
             data.get("description"),
             tasting_notes,
-            data.get("image_path")
+            data.get("image_path"),
+            data.get("cloudinary_id")
         ))
         wine_id = cursor.lastrowid
 
@@ -285,7 +298,7 @@ def update_wine(wine_id, data):
     updatable_fields = [
         "name", "producer", "vintage", "country", "region", "appellation",
         "style", "alcohol_percentage", "quantity", "drinking_window_start",
-        "drinking_window_end", "score", "description", "image_path"
+        "drinking_window_end", "score", "description", "image_path", "cloudinary_id"
     ]
 
     for field in updatable_fields:
