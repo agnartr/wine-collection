@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wine Collection Manager</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header>
+        <h1>Wine Collection Manager</h1>
+        <div class="stats-bar" id="stats-bar">
+            <span class="stat"><strong id="total-bottles">0</strong> bottles</span>
+            <span class="stat"><strong id="ready-to-drink">0</strong> ready to drink</span>
+            <span class="stat"><strong id="needs-cellaring">0</strong> need cellaring</span>
+        </div>
+    </header>
+
+    <main>
+        <section class="controls">
+            <div class="search-filter">
+                <input type="text" id="search-input" placeholder="Search wines...">
+                <select id="style-filter">
+                    <option value="">All Styles</option>
+                    <option value="Red">Red</option>
+                    <option value="White">White</option>
+                    <option value="Rosé">Rosé</option>
+                    <option value="Sparkling">Sparkling</option>
+                    <option value="Dessert">Dessert</option>
+                    <option value="Fortified">Fortified</option>
+                </select>
+                <select id="country-filter">
+                    <option value="">All Countries</option>
+                </select>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="drinking-now-filter">
+                    Ready to drink
+                </label>
+                <select id="sort-select">
+                    <option value="name-asc">Name A-Z</option>
+                    <option value="name-desc">Name Z-A</option>
+                    <option value="vintage-desc">Newest Vintage</option>
+                    <option value="vintage-asc">Oldest Vintage</option>
+                    <option value="score-desc">Highest Score</option>
+                    <option value="quantity-desc">Most Bottles</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" id="add-wine-btn">+ Add Wine</button>
+        </section>
+
+        <section class="wine-grid" id="wine-grid">
+            <!-- Wine cards will be rendered here -->
+        </section>
+    </main>
+
+    <!-- Add/Edit Wine Modal -->
+    <div class="modal" id="wine-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title">Add Wine</h2>
+                <button class="close-btn" id="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="upload-section" id="upload-section">
+                    <div class="upload-area" id="upload-area">
+                        <input type="file" id="image-input" accept="image/*" capture="environment">
+                        <div class="upload-prompt">
+                            <span class="upload-icon">📷</span>
+                            <p>Click to upload or take a photo of the wine label</p>
+                            <p class="upload-hint">AI will analyze the label automatically</p>
+                        </div>
+                        <img id="preview-image" class="preview-image hidden" alt="Wine preview">
+                    </div>
+                    <div class="analyzing hidden" id="analyzing">
+                        <div class="spinner"></div>
+                        <p>Analyzing wine label...</p>
+                    </div>
+                </div>
+
+                <form id="wine-form">
+                    <input type="hidden" id="wine-id">
+                    <input type="hidden" id="image-path">
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="wine-name">Wine Name *</label>
+                            <input type="text" id="wine-name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="wine-producer">Producer</label>
+                            <input type="text" id="wine-producer">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="wine-vintage">Vintage</label>
+                            <input type="number" id="wine-vintage" min="1800" max="2100">
+                        </div>
+                        <div class="form-group">
+                            <label for="wine-style">Style</label>
+                            <select id="wine-style">
+                                <option value="">Select...</option>
+                                <option value="Red">Red</option>
+                                <option value="White">White</option>
+                                <option value="Rosé">Rosé</option>
+                                <option value="Sparkling">Sparkling</option>
+                                <option value="Dessert">Dessert</option>
+                                <option value="Fortified">Fortified</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="wine-quantity">Quantity</label>
+                            <input type="number" id="wine-quantity" min="0" value="1">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="wine-country">Country</label>
+                            <input type="text" id="wine-country">
+                        </div>
+                        <div class="form-group">
+                            <label for="wine-region">Region</label>
+                            <input type="text" id="wine-region">
+                        </div>
+                        <div class="form-group">
+                            <label for="wine-appellation">Appellation</label>
+                            <input type="text" id="wine-appellation">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="wine-grapes">Grape Varieties</label>
+                            <input type="text" id="wine-grapes" placeholder="e.g., Cabernet Sauvignon, Merlot">
+                        </div>
+                        <div class="form-group">
+                            <label for="wine-alcohol">Alcohol %</label>
+                            <input type="number" id="wine-alcohol" step="0.1" min="0" max="100">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="wine-drink-start">Drink From</label>
+                            <input type="number" id="wine-drink-start" min="1900" max="2200">
+                        </div>
+                        <div class="form-group">
+                            <label for="wine-drink-end">Drink Until</label>
+                            <input type="number" id="wine-drink-end" min="1900" max="2200">
+                        </div>
+                        <div class="form-group">
+                            <label for="wine-score">Score (0-100)</label>
+                            <input type="number" id="wine-score" min="0" max="100">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="wine-description">Description</label>
+                        <textarea id="wine-description" rows="3"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="wine-tasting-notes">Tasting Notes</label>
+                        <textarea id="wine-tasting-notes" rows="3" placeholder="Aromas, flavors, body, tannins, etc."></textarea>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" id="cancel-btn">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Wine</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Wine Modal -->
+    <div class="modal" id="view-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="view-title">Wine Details</h2>
+                <button class="close-btn" id="close-view-modal">&times;</button>
+            </div>
+            <div class="modal-body" id="view-body">
+                <!-- Wine details will be rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
