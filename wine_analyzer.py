@@ -5,7 +5,18 @@ import base64
 import json
 from anthropic import Anthropic
 
-client = Anthropic()
+_client = None
+
+
+def get_client():
+    """Get or create the Anthropic client."""
+    global _client
+    if _client is None:
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            raise ValueError("ANTHROPIC_API_KEY environment variable is not set")
+        _client = Anthropic(api_key=api_key)
+    return _client
 
 ANALYSIS_PROMPT = """Analyze this wine bottle label image and extract as much information as possible.
 
@@ -81,6 +92,7 @@ def analyze_wine_image(image_path=None, image_base64=None, media_type="image/jpe
             return {"error": f"Error reading image: {str(e)}"}
 
     try:
+        client = get_client()
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=1500,
