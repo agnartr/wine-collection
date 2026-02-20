@@ -175,6 +175,17 @@ def get_stats():
     return jsonify(stats)
 
 
+@app.route("/api/debug", methods=["GET"])
+def debug_env():
+    """Debug endpoint to check environment."""
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    return jsonify({
+        "api_key_set": bool(api_key),
+        "api_key_length": len(api_key),
+        "api_key_prefix": api_key[:20] + "..." if len(api_key) > 20 else "too short"
+    })
+
+
 # Ensure upload directory exists on startup
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
