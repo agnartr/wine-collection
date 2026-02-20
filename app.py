@@ -38,22 +38,34 @@ def save_uploaded_file(file_content, filename):
     if not allowed_file(filename):
         return None, None
 
+    # Determine media type
+    ext = filename.rsplit(".", 1)[1].lower() if "." in filename else "jpg"
+    media_types = {
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "png": "image/png",
+        "gif": "image/gif",
+        "webp": "image/webp"
+    }
+    media_type = media_types.get(ext, "image/jpeg")
+
     if USE_CLOUDINARY:
-        # Upload to Cloudinary
+        # Upload to Cloudinary using base64 data URI
         try:
+            b64_data = base64.standard_b64encode(file_content).decode("utf-8")
+            data_uri = f"data:{media_type};base64,{b64_data}"
             result = cloudinary.uploader.upload(
-                file_content,
+                data_uri,
                 folder="wine-collection",
                 resource_type="image"
             )
             # Return (cloudinary_url, public_id)
             return result["secure_url"], result["public_id"]
         except Exception as e:
-            print(f"Cloudinary upload error: {e}")
+            print(f"Cloudinary upload error: {e}", flush=True)
             return None, None
     else:
         # Save locally
-        ext = filename.rsplit(".", 1)[1].lower()
         new_filename = f"{uuid.uuid4()}.{ext}"
         filepath = UPLOAD_FOLDER / new_filename
         with open(filepath, "wb") as f:
