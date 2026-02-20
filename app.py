@@ -30,19 +30,19 @@ def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def save_uploaded_file(file):
+def save_uploaded_file(file_content, filename):
     """Save uploaded file and return path/URL."""
-    if not file or not file.filename:
+    if not file_content or not filename:
         return None, None
 
-    if not allowed_file(file.filename):
+    if not allowed_file(filename):
         return None, None
 
     if USE_CLOUDINARY:
         # Upload to Cloudinary
         try:
             result = cloudinary.uploader.upload(
-                file,
+                file_content,
                 folder="wine-collection",
                 resource_type="image"
             )
@@ -53,24 +53,25 @@ def save_uploaded_file(file):
             return None, None
     else:
         # Save locally
-        ext = file.filename.rsplit(".", 1)[1].lower()
-        filename = f"{uuid.uuid4()}.{ext}"
-        filepath = UPLOAD_FOLDER / filename
-        file.save(filepath)
-        return f"uploads/{filename}", None
+        ext = filename.rsplit(".", 1)[1].lower()
+        new_filename = f"{uuid.uuid4()}.{ext}"
+        filepath = UPLOAD_FOLDER / new_filename
+        with open(filepath, "wb") as f:
+            f.write(file_content)
+        return f"uploads/{new_filename}", None
 
 
 def get_image_for_analysis(file):
-    """Get image data for AI analysis. Returns (base64_data, media_type, temp_path)."""
+    """Get image data for AI analysis. Returns (base64_data, media_type, file_content, filename)."""
     if not file:
-        return None, None, None
+        return None, None, None, None
 
     # Read file content
     content = file.read()
-    file.seek(0)  # Reset for potential re-read
 
     # Determine media type
-    ext = file.filename.rsplit(".", 1)[1].lower() if file.filename else "jpg"
+    filename = file.filename if file.filename else "image.jpg"
+    ext = filename.rsplit(".", 1)[1].lower() if "." in filename else "jpg"
     media_types = {
         "jpg": "image/jpeg",
         "jpeg": "image/jpeg",
@@ -83,7 +84,7 @@ def get_image_for_analysis(file):
     # Encode to base64
     b64_data = base64.standard_b64encode(content).decode("utf-8")
 
-    return b64_data, media_type, None
+    return b64_data, media_type, content, filename
 
 
 def delete_cloudinary_image(public_id):
@@ -214,7 +215,7 @@ def analyze_image():
         return jsonify({"error": "Invalid file type. Allowed: png, jpg, jpeg, gif, webp"}), 400
 
     # Get image data for analysis
-    b64_data, media_type, _ = get_image_for_analysis(file)
+    b64_data, media_type, file_content, filename = get_image_for_analysis(file)
     if not b64_data:
         return jsonify({"error": "Failed to process image"}), 500
 
@@ -225,8 +226,7 @@ def analyze_image():
     cleaned = validate_wine_data(result)
 
     # Save the file (after analysis succeeds)
-    file.seek(0)  # Reset file pointer
-    image_url, cloudinary_id = save_uploaded_file(file)
+    image_url, cloudinary_id = save_uploaded_file(file_content, filename)
 
     if image_url:
         cleaned["image_path"] = image_url
@@ -261,7 +261,7 @@ def drink_wine():
         return jsonify({"error": "Invalid file type. Allowed: png, jpg, jpeg, gif, webp"}), 400
 
     # Get image data for analysis (don't save, just analyze)
-    b64_data, media_type, _ = get_image_for_analysis(file)
+    b64_data, media_type, _, _ = get_image_for_analysis(file)
     if not b64_data:
         return jsonify({"error": "Failed to process image"}), 500
 
