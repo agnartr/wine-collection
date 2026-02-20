@@ -53,8 +53,16 @@ Important guidelines:
 - For drinking windows, consider the wine style, region, and vintage quality
 - For scores, be conservative and base it on typical quality for the producer/region
 - If the image is not a wine bottle or label, return {"error": "Not a wine label image"}
-- IMPORTANT: If you cannot clearly determine the wine style (red/white/rosé) from the image, or if the producer makes both red and white versions of a wine with similar labels, set "needs_clarification": true and add a question like "Is this wine red or white?" to clarification_questions
-- If you're uncertain about any critical field (style, vintage, producer), ask for clarification rather than guessing
+
+CRITICAL - Wine style clarification:
+- Many Burgundy appellations (Santenay, Meursault, Pommard, Gevrey-Chambertin, Bourgogne, etc.) can be BOTH red and white
+- Many producers make both red AND white versions with nearly identical labels
+- If you CANNOT see the actual wine color through the bottle, AND the appellation/region produces both styles, you MUST:
+  1. Set "needs_clarification": true
+  2. Add "Is this wine red or white?" to clarification_questions
+  3. Set "style": null (do not guess!)
+- Only set the style confidently if you can see the wine color, or if the label explicitly states "Blanc", "Rouge", "White", "Red", or lists a grape that's clearly one color (e.g., Chardonnay = white, Pinot Noir = typically red)
+- When in doubt, ASK. It's better to ask than to guess wrong.
 
 Return ONLY the JSON object, no additional text."""
 
