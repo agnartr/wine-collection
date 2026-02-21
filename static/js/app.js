@@ -352,6 +352,7 @@ function renderWineDetails(wine) {
             ${wine.quantity !== undefined ? `<div class="view-detail"><div class="view-detail-label">Quantity</div>${wine.quantity} bottles</div>` : ''}
             ${wine.drinking_window_start && wine.drinking_window_end ? `<div class="view-detail"><div class="view-detail-label">Drinking Window</div>${wine.drinking_window_start} - ${wine.drinking_window_end}</div>` : ''}
             ${wine.score ? `<div class="view-detail"><div class="view-detail-label">Score</div>${wine.score} points</div>` : ''}
+            ${wine.price ? `<div class="view-detail"><div class="view-detail-label">Price</div>${wine.price} ${wine.price_currency || 'USD'}</div>` : ''}
         </div>
         ${wine.description ? `<div class="view-wine-description">${escapeHtml(wine.description)}</div>` : ''}
         ${notesHtml}
@@ -402,6 +403,8 @@ function openEditModal(wine) {
     document.getElementById('wine-drink-start').value = wine.drinking_window_start || '';
     document.getElementById('wine-drink-end').value = wine.drinking_window_end || '';
     document.getElementById('wine-score').value = wine.score || '';
+    document.getElementById('wine-price').value = wine.price || '';
+    document.getElementById('wine-currency').value = wine.price_currency || 'USD';
     document.getElementById('wine-description').value = wine.description || '';
 
     // Format tasting notes
@@ -489,7 +492,9 @@ async function handleFormSubmit(e) {
         score: parseInt(document.getElementById('wine-score').value) || null,
         description: document.getElementById('wine-description').value || null,
         tasting_notes: parseTastingNotes(document.getElementById('wine-tasting-notes').value),
-        image_path: document.getElementById('image-path').value || null
+        image_path: document.getElementById('image-path').value || null,
+        price: parseFloat(document.getElementById('wine-price').value) || null,
+        price_currency: document.getElementById('wine-currency').value || 'USD'
     };
 
     try {
@@ -595,6 +600,8 @@ function fillFormWithResult(result) {
         document.getElementById('wine-tasting-notes').value = formatTastingNotesForEdit(result.tasting_notes);
     }
     if (result.image_path) document.getElementById('image-path').value = result.image_path;
+    if (result.price) document.getElementById('wine-price').value = result.price;
+    if (result.price_currency) document.getElementById('wine-currency').value = result.price_currency;
 }
 
 function showClarificationQuestions(questions) {

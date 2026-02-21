@@ -68,15 +68,33 @@ def init_db():
                 tasting_notes TEXT,
                 image_path TEXT,
                 cloudinary_id TEXT,
+                price DECIMAL(10,2),
+                price_currency TEXT DEFAULT 'USD',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        # Add cloudinary_id column if it doesn't exist (for existing tables)
+        # Add columns if they don't exist (for existing tables)
         cursor.execute("""
             DO $$
             BEGIN
                 ALTER TABLE wines ADD COLUMN cloudinary_id TEXT;
+            EXCEPTION
+                WHEN duplicate_column THEN NULL;
+            END $$;
+        """)
+        cursor.execute("""
+            DO $$
+            BEGIN
+                ALTER TABLE wines ADD COLUMN price DECIMAL(10,2);
+            EXCEPTION
+                WHEN duplicate_column THEN NULL;
+            END $$;
+        """)
+        cursor.execute("""
+            DO $$
+            BEGIN
+                ALTER TABLE wines ADD COLUMN price_currency TEXT DEFAULT 'USD';
             EXCEPTION
                 WHEN duplicate_column THEN NULL;
             END $$;
@@ -102,6 +120,8 @@ def init_db():
                 tasting_notes TEXT,
                 image_path TEXT,
                 cloudinary_id TEXT,
+                price REAL,
+                price_currency TEXT DEFAULT 'USD',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -159,8 +179,9 @@ def create_wine(data):
                 name, producer, vintage, country, region, appellation,
                 style, grape_varieties, alcohol_percentage, quantity,
                 drinking_window_start, drinking_window_end, score,
-                description, tasting_notes, image_path, cloudinary_id
-            ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
+                description, tasting_notes, image_path, cloudinary_id,
+                price, price_currency
+            ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
             RETURNING id
         """, (
             data.get("name"),
@@ -179,7 +200,9 @@ def create_wine(data):
             data.get("description"),
             tasting_notes,
             data.get("image_path"),
-            data.get("cloudinary_id")
+            data.get("cloudinary_id"),
+            data.get("price"),
+            data.get("price_currency", "USD")
         ))
         wine_id = cursor.fetchone()["id"]
     else:
@@ -188,8 +211,9 @@ def create_wine(data):
                 name, producer, vintage, country, region, appellation,
                 style, grape_varieties, alcohol_percentage, quantity,
                 drinking_window_start, drinking_window_end, score,
-                description, tasting_notes, image_path, cloudinary_id
-            ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
+                description, tasting_notes, image_path, cloudinary_id,
+                price, price_currency
+            ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
         """, (
             data.get("name"),
             data.get("producer"),
@@ -207,7 +231,9 @@ def create_wine(data):
             data.get("description"),
             tasting_notes,
             data.get("image_path"),
-            data.get("cloudinary_id")
+            data.get("cloudinary_id"),
+            data.get("price"),
+            data.get("price_currency", "USD")
         ))
         wine_id = cursor.lastrowid
 
@@ -298,7 +324,8 @@ def update_wine(wine_id, data):
     updatable_fields = [
         "name", "producer", "vintage", "country", "region", "appellation",
         "style", "alcohol_percentage", "quantity", "drinking_window_start",
-        "drinking_window_end", "score", "description", "image_path", "cloudinary_id"
+        "drinking_window_end", "score", "description", "image_path", "cloudinary_id",
+        "price", "price_currency"
     ]
 
     for field in updatable_fields:

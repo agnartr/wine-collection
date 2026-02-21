@@ -349,8 +349,9 @@ Suggest up to 3 wines from their collection that would pair well with this food.
 Consider:
 - Classic food and wine pairing principles (acidity, weight, flavors)
 - The wines that are ready to drink now (check drinking windows vs current year 2026)
-- If the food sounds casual (pizza, Tuesday dinner, takeout), prefer more affordable everyday wines
-- If it sounds special (anniversary, celebration, fancy dinner), premium wines are appropriate
+- If the food sounds casual (pizza, Tuesday dinner, takeout), prefer more affordable wines (use price field if available)
+- If it sounds special (anniversary, celebration, fancy dinner), premium/expensive wines are appropriate
+- Use the price field to help determine everyday vs special occasion wines
 
 Return a JSON object:
 {{
@@ -402,6 +403,7 @@ def get_wine_pairing(wines, food_description):
             "grape_varieties": w.get("grape_varieties", []),
             "quantity": w.get("quantity", 0),
             "drinking_window": f"{w.get('drinking_window_start', '?')}-{w.get('drinking_window_end', '?')}",
+            "price": w.get("price"),
         }
         # Only include wines with quantity > 0
         if wine_info["quantity"] > 0:
