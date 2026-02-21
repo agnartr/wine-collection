@@ -148,6 +148,16 @@ Future implementation plan for self-hosting with multi-user support and wine pai
   sudo certbot certonly --manual --preferred-challenges=dns -d "*.wine.yourdomain.com"
   ```
 
+- [ ] **2.7** Add user indicator in header
+  - Show instance/user name
+  - Logout/switch link
+
+- [ ] **2.8** CSV Export feature
+  - Add "Export" button to UI
+  - Endpoint: `GET /api/export/csv`
+  - Downloads all wines as CSV file
+  - Columns: name, producer, vintage, style, country, region, quantity, price, drinking window, score, etc.
+
 ---
 
 ## Phase 3: Add Price Field
