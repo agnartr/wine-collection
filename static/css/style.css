@@ -31,9 +31,12 @@ body {
 
 /* Header */
 header {
-    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    background: linear-gradient(rgba(114, 47, 55, 0.7), rgba(90, 37, 44, 0.8)),
+                url('/static/images/header-bg.png');
+    background-size: cover;
+    background-position: center;
     color: white;
-    padding: 1.5rem 2rem;
+    padding: 2rem 2rem;
     box-shadow: var(--shadow);
 }
 
