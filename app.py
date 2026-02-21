@@ -7,7 +7,7 @@ from pathlib import Path
 from flask import Flask, request, jsonify, render_template, send_from_directory
 
 import database
-from wine_analyzer import analyze_wine_image, identify_wine_image, validate_wine_data, analyze_with_clarification
+from wine_analyzer import analyze_wine_image, identify_wine_image, validate_wine_data, analyze_with_clarification, get_wine_pairing
 
 # Cloudinary configuration
 CLOUDINARY_URL = os.environ.get("CLOUDINARY_URL")
@@ -363,6 +363,26 @@ def get_stats():
     """Get collection statistics."""
     stats = database.get_stats()
     return jsonify(stats)
+
+
+@app.route("/api/pair", methods=["POST"])
+def pair_wine():
+    """Get wine pairing suggestions for a food description."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    food_description = data.get("food")
+    if not food_description:
+        return jsonify({"error": "Please describe what you're eating"}), 400
+
+    # Get all wines from the collection
+    wines = database.get_all_wines()
+
+    # Get pairing suggestions
+    suggestions = get_wine_pairing(wines, food_description)
+
+    return jsonify(suggestions)
 
 
 @app.route("/api/debug", methods=["GET"])

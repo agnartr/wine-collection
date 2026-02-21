@@ -688,3 +688,119 @@ main {
 .mb-2 { margin-bottom: 1rem; }
 .mt-1 { margin-top: 0.5rem; }
 .mt-2 { margin-top: 1rem; }
+
+/* Pairing Modal */
+.pair-input-section {
+    text-align: center;
+}
+
+.pair-input-section p {
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+    color: var(--text-color);
+}
+
+.pair-input-section textarea {
+    width: 100%;
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    font-size: 1rem;
+    font-family: inherit;
+    margin-bottom: 1rem;
+    resize: vertical;
+}
+
+.pair-input-section textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(114, 47, 55, 0.1);
+}
+
+.pair-results {
+    padding: 1rem 0;
+}
+
+.pair-suggestion {
+    background: var(--secondary-color);
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-left: 4px solid var(--primary-color);
+}
+
+.pair-suggestion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+}
+
+.pair-suggestion-name {
+    font-weight: 600;
+    color: var(--primary-color);
+    font-size: 1.1rem;
+}
+
+.pair-suggestion-vintage {
+    color: var(--text-light);
+    font-size: 0.9rem;
+}
+
+.pair-match-level {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.pair-match-level.perfect {
+    background: #d4edda;
+    color: #155724;
+}
+
+.pair-match-level.great {
+    background: #cce5ff;
+    color: #004085;
+}
+
+.pair-match-level.good {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.pair-suggestion-why {
+    font-size: 0.95rem;
+    color: var(--text-color);
+    line-height: 1.5;
+}
+
+.pair-tip {
+    background: #e7f3ff;
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin: 1rem 0;
+    font-size: 0.95rem;
+    color: #004085;
+}
+
+.pair-tip:empty {
+    display: none;
+}
+
+.pair-no-results {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-light);
+}
+
+.pair-no-results-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+#pair-again-btn {
+    width: 100%;
+    margin-top: 1rem;
+}

@@ -47,6 +47,7 @@
             </div>
             <div class="button-group">
                 <button class="btn btn-primary" id="add-wine-btn">+ Add Wine</button>
+                <button class="btn btn-secondary" id="pair-wine-btn">🍽️ Pair</button>
                 <button class="btn btn-secondary" id="drink-wine-btn">🍷 Drink</button>
             </div>
         </section>
@@ -243,6 +244,32 @@
                         <span class="error-icon">😕</span>
                         <p id="drink-error-message"></p>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pair Wine Modal -->
+    <div class="modal" id="pair-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🍽️ Wine Pairing</h2>
+                <button class="close-btn" id="close-pair-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="pair-input-section" id="pair-input-section">
+                    <p>What are you eating?</p>
+                    <textarea id="food-input" rows="2" placeholder="e.g., Grilled steak with mushrooms, Tuesday pizza night, Sushi dinner..."></textarea>
+                    <button class="btn btn-primary" id="get-pairing-btn">Find Wines</button>
+                </div>
+                <div class="analyzing hidden" id="pair-analyzing">
+                    <div class="spinner"></div>
+                    <p>Finding the perfect pairing...</p>
+                </div>
+                <div class="pair-results hidden" id="pair-results">
+                    <div id="pair-suggestions"></div>
+                    <div class="pair-tip" id="pair-tip"></div>
+                    <button class="btn btn-secondary" id="pair-again-btn">Try Another</button>
                 </div>
             </div>
         </div>

@@ -57,7 +57,19 @@ const elements = {
     drinkSuccess: document.getElementById('drink-success'),
     drinkError: document.getElementById('drink-error'),
     drinkMessage: document.getElementById('drink-message'),
-    drinkErrorMessage: document.getElementById('drink-error-message')
+    drinkErrorMessage: document.getElementById('drink-error-message'),
+    // Pairing modal elements
+    pairWineBtn: document.getElementById('pair-wine-btn'),
+    pairModal: document.getElementById('pair-modal'),
+    closePairModal: document.getElementById('close-pair-modal'),
+    foodInput: document.getElementById('food-input'),
+    getPairingBtn: document.getElementById('get-pairing-btn'),
+    pairInputSection: document.getElementById('pair-input-section'),
+    pairAnalyzing: document.getElementById('pair-analyzing'),
+    pairResults: document.getElementById('pair-results'),
+    pairSuggestions: document.getElementById('pair-suggestions'),
+    pairTip: document.getElementById('pair-tip'),
+    pairAgainBtn: document.getElementById('pair-again-btn')
 };
 
 // Initialize
@@ -109,6 +121,15 @@ function setupEventListeners() {
 
     // Drink image upload
     elements.drinkImageInput.addEventListener('change', handleDrinkImageUpload);
+
+    // Pairing modal
+    elements.pairWineBtn.addEventListener('click', openPairModal);
+    elements.closePairModal.addEventListener('click', closePairModal);
+    elements.getPairingBtn.addEventListener('click', handleGetPairing);
+    elements.pairAgainBtn.addEventListener('click', resetPairModal);
+    elements.pairModal.addEventListener('click', (e) => {
+        if (e.target === elements.pairModal) closePairModal();
+    });
 }
 
 // API Functions
@@ -738,6 +759,105 @@ async function handleDrinkImageUpload(e) {
         elements.drinkSuccess.classList.add('hidden');
         elements.drinkError.classList.remove('hidden');
         elements.drinkErrorMessage.textContent = 'Failed to process image';
+    }
+}
+
+// Pairing Functions
+function openPairModal() {
+    resetPairModal();
+    elements.pairModal.classList.add('active');
+}
+
+function closePairModal() {
+    elements.pairModal.classList.remove('active');
+}
+
+function resetPairModal() {
+    elements.foodInput.value = '';
+    elements.pairInputSection.classList.remove('hidden');
+    elements.pairAnalyzing.classList.add('hidden');
+    elements.pairResults.classList.add('hidden');
+}
+
+async function handleGetPairing() {
+    const food = elements.foodInput.value.trim();
+    if (!food) {
+        showError('Please describe what you are eating');
+        return;
+    }
+
+    // Show loading
+    elements.pairInputSection.classList.add('hidden');
+    elements.pairAnalyzing.classList.remove('hidden');
+    elements.pairResults.classList.add('hidden');
+
+    try {
+        const response = await fetch(`${API_BASE}/pair`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ food })
+        });
+
+        const result = await response.json();
+
+        elements.pairAnalyzing.classList.add('hidden');
+        elements.pairResults.classList.remove('hidden');
+
+        if (result.error) {
+            elements.pairSuggestions.innerHTML = `
+                <div class="pair-no-results">
+                    <div class="pair-no-results-icon">😕</div>
+                    <p>${escapeHtml(result.error)}</p>
+                </div>
+            `;
+            elements.pairTip.textContent = '';
+        } else {
+            displayPairingSuggestions(result);
+        }
+
+    } catch (error) {
+        console.error('Error getting pairing:', error);
+        elements.pairAnalyzing.classList.add('hidden');
+        elements.pairResults.classList.remove('hidden');
+        elements.pairSuggestions.innerHTML = `
+            <div class="pair-no-results">
+                <div class="pair-no-results-icon">😕</div>
+                <p>Failed to get pairing suggestions</p>
+            </div>
+        `;
+        elements.pairTip.textContent = '';
+    }
+}
+
+function displayPairingSuggestions(result) {
+    const suggestions = result.suggestions || [];
+
+    if (suggestions.length === 0) {
+        elements.pairSuggestions.innerHTML = `
+            <div class="pair-no-results">
+                <div class="pair-no-results-icon">🤷</div>
+                <p>No perfect matches found in your collection</p>
+            </div>
+        `;
+    } else {
+        elements.pairSuggestions.innerHTML = suggestions.map(s => `
+            <div class="pair-suggestion">
+                <div class="pair-suggestion-header">
+                    <div>
+                        <span class="pair-suggestion-name">${escapeHtml(s.wine_name)}</span>
+                        ${s.vintage ? `<span class="pair-suggestion-vintage">(${s.vintage})</span>` : ''}
+                    </div>
+                    <span class="pair-match-level ${s.match_level}">${s.match_level}</span>
+                </div>
+                <p class="pair-suggestion-why">${escapeHtml(s.why)}</p>
+            </div>
+        `).join('');
+    }
+
+    if (result.tip) {
+        elements.pairTip.textContent = result.tip;
+    } else {
+        elements.pairTip.textContent = '';
     }
 }
 

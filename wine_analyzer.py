@@ -337,6 +337,122 @@ def identify_wine_image(image_path=None, image_base64=None, media_type="image/jp
         return {"error": f"API error: {str(e)}"}
 
 
+PAIRING_PROMPT = """You are an expert sommelier helping someone choose a wine from their personal collection.
+
+Their wine collection:
+{wines_json}
+
+They are having: {food_description}
+
+Suggest up to 3 wines from their collection that would pair well with this food.
+
+Consider:
+- Classic food and wine pairing principles (acidity, weight, flavors)
+- The wines that are ready to drink now (check drinking windows vs current year 2026)
+- If the food sounds casual (pizza, Tuesday dinner, takeout), prefer more affordable everyday wines
+- If it sounds special (anniversary, celebration, fancy dinner), premium wines are appropriate
+
+Return a JSON object:
+{{
+    "suggestions": [
+        {{
+            "wine_id": 1,
+            "wine_name": "Full wine name",
+            "vintage": 2020,
+            "why": "One sentence explaining the pairing",
+            "match_level": "perfect|great|good"
+        }}
+    ],
+    "tip": "Optional brief tip about serving or the pairing"
+}}
+
+If no wines in the collection would pair well, return:
+{{"suggestions": [], "tip": "Why no good matches were found"}}
+
+Return ONLY the JSON object, no additional text."""
+
+
+def get_wine_pairing(wines, food_description):
+    """
+    Get wine pairing suggestions from the user's collection.
+
+    Args:
+        wines: List of wine dictionaries from the database
+        food_description: What the user is eating/cooking
+
+    Returns:
+        dict: Suggestions with wine IDs and explanations
+    """
+    if not wines:
+        return {"suggestions": [], "tip": "Your collection is empty. Add some wines first!"}
+
+    if not food_description:
+        return {"error": "Please describe what you're eating"}
+
+    # Format wines for the prompt (simplified to save tokens)
+    wines_for_prompt = []
+    for w in wines:
+        wine_info = {
+            "id": w["id"],
+            "name": w["name"],
+            "style": w.get("style"),
+            "vintage": w.get("vintage"),
+            "region": w.get("region"),
+            "country": w.get("country"),
+            "grape_varieties": w.get("grape_varieties", []),
+            "quantity": w.get("quantity", 0),
+            "drinking_window": f"{w.get('drinking_window_start', '?')}-{w.get('drinking_window_end', '?')}",
+        }
+        # Only include wines with quantity > 0
+        if wine_info["quantity"] > 0:
+            wines_for_prompt.append(wine_info)
+
+    if not wines_for_prompt:
+        return {"suggestions": [], "tip": "No bottles available in your collection."}
+
+    prompt = PAIRING_PROMPT.format(
+        wines_json=json.dumps(wines_for_prompt, indent=2),
+        food_description=food_description
+    )
+
+    try:
+        client = get_client()
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1000,
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        )
+
+        response_text = response.content[0].text.strip()
+
+        # Handle markdown code blocks
+        if response_text.startswith("```"):
+            lines = response_text.split("\n")
+            json_lines = []
+            in_json = False
+            for line in lines:
+                if line.startswith("```") and not in_json:
+                    in_json = True
+                    continue
+                elif line.startswith("```") and in_json:
+                    break
+                elif in_json:
+                    json_lines.append(line)
+            response_text = "\n".join(json_lines)
+
+        return json.loads(response_text)
+
+    except json.JSONDecodeError as e:
+        return {"error": f"Failed to parse response: {str(e)}"}
+    except Exception as e:
+        return {"error": f"API error: {str(e)}"}
+
+
 def validate_wine_data(data):
     """
     Validate and clean wine data from AI analysis.
