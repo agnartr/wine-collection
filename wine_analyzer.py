@@ -67,6 +67,38 @@ CRITICAL - Wine style clarification:
 Return ONLY the JSON object, no additional text."""
 
 
+CLARIFIED_ANALYSIS_PROMPT = """Analyze this wine bottle label image. The user has confirmed this is a {style} wine.
+
+Return a JSON object with the following fields (use null for any fields you cannot determine):
+
+{{
+    "name": "Full wine name",
+    "producer": "Winery/Producer name",
+    "vintage": 2020,
+    "country": "Country of origin",
+    "region": "Wine region",
+    "appellation": "Specific appellation/AOC/DOC if visible",
+    "style": "{style}",
+    "grape_varieties": ["Grape1", "Grape2"],
+    "alcohol_percentage": 13.5,
+    "drinking_window_start": 2024,
+    "drinking_window_end": 2030,
+    "score": 88,
+    "description": "Brief description of the wine and producer",
+    "tasting_notes": {{
+        "aromas": ["aroma1", "aroma2"],
+        "flavors": ["flavor1", "flavor2"],
+        "body": "Light|Medium|Full",
+        "tannins": "Low|Medium|High",
+        "acidity": "Low|Medium|High",
+        "finish": "Short|Medium|Long"
+    }}
+}}
+
+Provide tasting notes and drinking windows appropriate for a {style} wine from this region/producer.
+Return ONLY the JSON object, no additional text."""
+
+
 IDENTIFY_PROMPT = """Look at this wine bottle image and identify the wine.
 
 Return a JSON object with just the key identifying information:
@@ -168,6 +200,64 @@ def analyze_wine_image(image_path=None, image_base64=None, media_type="image/jpe
 
     except json.JSONDecodeError as e:
         return {"error": f"Failed to parse AI response: {str(e)}", "raw_response": response_text}
+    except Exception as e:
+        return {"error": f"API error: {str(e)}"}
+
+
+def analyze_with_clarification(image_base64, media_type, style):
+    """
+    Re-analyze a wine image with clarified style information.
+    """
+    if not image_base64:
+        return {"error": "No image provided"}
+
+    prompt = CLARIFIED_ANALYSIS_PROMPT.format(style=style)
+
+    try:
+        client = get_client()
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1500,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": media_type,
+                                "data": image_base64
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "text": prompt
+                        }
+                    ]
+                }
+            ]
+        )
+
+        response_text = response.content[0].text.strip()
+        if response_text.startswith("```"):
+            lines = response_text.split("\n")
+            json_lines = []
+            in_json = False
+            for line in lines:
+                if line.startswith("```") and not in_json:
+                    in_json = True
+                    continue
+                elif line.startswith("```") and in_json:
+                    break
+                elif in_json:
+                    json_lines.append(line)
+            response_text = "\n".join(json_lines)
+
+        return json.loads(response_text)
+
+    except json.JSONDecodeError as e:
+        return {"error": f"Failed to parse AI response: {str(e)}"}
     except Exception as e:
         return {"error": f"API error: {str(e)}"}
 

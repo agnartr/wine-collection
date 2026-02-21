@@ -7,7 +7,7 @@ from pathlib import Path
 from flask import Flask, request, jsonify, render_template, send_from_directory
 
 import database
-from wine_analyzer import analyze_wine_image, identify_wine_image, validate_wine_data
+from wine_analyzer import analyze_wine_image, identify_wine_image, validate_wine_data, analyze_with_clarification
 
 # Cloudinary configuration
 CLOUDINARY_URL = os.environ.get("CLOUDINARY_URL")
@@ -247,6 +247,49 @@ def analyze_image():
 
     # Check if this wine already exists in the database
     if not cleaned.get("error") and not cleaned.get("needs_clarification"):
+        existing = database.find_matching_wine(
+            name=cleaned.get("name"),
+            producer=cleaned.get("producer"),
+            vintage=cleaned.get("vintage")
+        )
+        if existing:
+            cleaned["existing_wine"] = existing
+            cleaned["is_duplicate"] = True
+
+    return jsonify(cleaned)
+
+
+@app.route("/api/analyze-clarified", methods=["POST"])
+def analyze_clarified():
+    """Re-analyze a wine image with clarified style information."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    image_base64 = data.get("image_base64")
+    media_type = data.get("media_type", "image/jpeg")
+    style = data.get("style")
+
+    if not image_base64:
+        return jsonify({"error": "No image data provided"}), 400
+
+    if not style:
+        return jsonify({"error": "No style provided"}), 400
+
+    # Re-analyze with the clarified style
+    result = analyze_with_clarification(image_base64, media_type, style)
+
+    # Validate and clean the data
+    cleaned = validate_wine_data(result)
+
+    # Preserve the original image path and cloudinary_id if provided
+    if data.get("image_path"):
+        cleaned["image_path"] = data["image_path"]
+    if data.get("cloudinary_id"):
+        cleaned["cloudinary_id"] = data["cloudinary_id"]
+
+    # Check if this wine already exists in the database
+    if not cleaned.get("error"):
         existing = database.find_matching_wine(
             name=cleaned.get("name"),
             producer=cleaned.get("producer"),

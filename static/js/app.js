@@ -7,6 +7,7 @@ let wines = [];
 let currentFilters = {};
 let editingWineId = null;
 let pendingWineData = null;  // Store wine data when waiting for clarification or duplicate decision
+let pendingImageData = null;  // Store image data for re-analysis after clarification
 
 // DOM Elements
 const elements = {
@@ -344,6 +345,7 @@ function renderWineDetails(wine) {
 function openAddModal() {
     editingWineId = null;
     pendingWineData = null;
+    pendingImageData = null;
     elements.modalTitle.textContent = 'Add Wine';
     elements.wineForm.reset();
     document.getElementById('wine-id').value = '';
@@ -360,6 +362,7 @@ function openAddModal() {
 function openEditModal(wine) {
     editingWineId = wine.id;
     pendingWineData = null;
+    pendingImageData = null;
     elements.modalTitle.textContent = 'Edit Wine';
 
     // Fill form
@@ -406,6 +409,7 @@ function closeModal() {
     elements.wineModal.classList.remove('active');
     editingWineId = null;
     pendingWineData = null;
+    pendingImageData = null;
     elements.clarificationSection.classList.add('hidden');
     elements.duplicateAlert.classList.add('hidden');
 }
@@ -486,12 +490,21 @@ async function handleImageUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Show preview
+    // Show preview and store base64 for potential re-analysis
     const reader = new FileReader();
     reader.onload = (e) => {
         elements.previewImage.src = e.target.result;
         elements.previewImage.classList.remove('hidden');
         document.querySelector('.upload-prompt').classList.add('hidden');
+
+        // Store the base64 data for potential re-analysis after clarification
+        const dataUrl = e.target.result;
+        const base64Data = dataUrl.split(',')[1];  // Remove "data:image/...;base64," prefix
+        const mediaType = dataUrl.split(';')[0].split(':')[1];  // Extract media type
+        pendingImageData = {
+            base64: base64Data,
+            mediaType: mediaType
+        };
     };
     reader.readAsDataURL(file);
 
@@ -590,17 +603,58 @@ function showClarificationQuestions(questions) {
     elements.clarificationSection.classList.remove('hidden');
 }
 
-function handleClarificationSubmit() {
-    // Get answers and update form
+async function handleClarificationSubmit() {
+    // Get the selected style
     const selects = elements.clarificationQuestions.querySelectorAll('select');
+    let selectedStyle = null;
+
     selects.forEach(select => {
         const field = select.dataset.field;
-        if (field && select.value) {
+        if (field === 'style' && select.value) {
+            selectedStyle = select.value;
             document.getElementById(`wine-${field}`).value = select.value;
         }
     });
 
     elements.clarificationSection.classList.add('hidden');
+
+    // If we have image data and a style, re-analyze for accurate details
+    if (pendingImageData && selectedStyle) {
+        elements.analyzingIndicator.classList.remove('hidden');
+
+        try {
+            const response = await fetch(`${API_BASE}/analyze-clarified`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    image_base64: pendingImageData.base64,
+                    media_type: pendingImageData.mediaType,
+                    style: selectedStyle,
+                    image_path: pendingWineData?.image_path,
+                    cloudinary_id: pendingWineData?.cloudinary_id
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.error) {
+                console.error('Re-analysis error:', result.error);
+            } else {
+                // Update form with the detailed, style-specific results
+                pendingWineData = result;
+                fillFormWithResult(result);
+
+                // Check if this is a duplicate after clarification
+                if (result.is_duplicate && result.existing_wine) {
+                    showDuplicateAlert(result.existing_wine);
+                }
+            }
+        } catch (error) {
+            console.error('Error re-analyzing with clarification:', error);
+        } finally {
+            elements.analyzingIndicator.classList.add('hidden');
+        }
+    }
 }
 
 function showDuplicateAlert(existingWine) {
