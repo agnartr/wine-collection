@@ -161,43 +161,33 @@ Future implementation plan for self-hosting with multi-user support and wine pai
 
 ---
 
-## Phase 3: Add Price Field
+## Phase 3: Add Price Field (DONE)
 
-- [ ] **3.1** Database migration
+- [x] **3.1** Database migration
   ```sql
   ALTER TABLE wines ADD COLUMN price DECIMAL(10,2);
   ALTER TABLE wines ADD COLUMN price_currency TEXT DEFAULT 'USD';
   ```
 
-- [ ] **3.2** Update `database.py`
+- [x] **3.2** Update `database.py`
   - Add `price` and `price_currency` to create/update functions
   - Add to `updatable_fields` list
 
-- [ ] **3.3** Update `wine_analyzer.py` prompt
-  ```
-  "price_estimate": 25.00,  // Estimated retail price if visible or inferable
-  ```
+- [x] **3.3** Update `wine_analyzer.py` prompt
+  - Pairing AI now considers price for suggestions
 
-- [ ] **3.4** Update `index.html` form
-  ```html
-  <label for="wine-price">Price</label>
-  <input type="number" id="wine-price" step="0.01" placeholder="29.99">
-  <select id="wine-currency">
-      <option value="USD">USD</option>
-      <option value="EUR">EUR</option>
-      <option value="ISK">ISK</option>
-  </select>
-  ```
+- [x] **3.4** Update `index.html` form
+  - Added price and currency fields
 
-- [ ] **3.5** Update `app.js`
+- [x] **3.5** Update `app.js`
   - Add price to form handling
-  - Display price on wine cards and detail view
+  - Display price in wine detail view
 
 ---
 
-## Phase 4: Wine Pairing Feature
+## Phase 4: Wine Pairing Feature (DONE)
 
-- [ ] **4.1** Create pairing prompt in `wine_analyzer.py`
+- [x] **4.1** Create pairing prompt in `wine_analyzer.py`
   ```python
   PAIRING_PROMPT = """You are a sommelier. The user has this wine collection:
 
@@ -229,7 +219,7 @@ Future implementation plan for self-hosting with multi-user support and wine pai
   """
   ```
 
-- [ ] **4.2** Add pairing function in `wine_analyzer.py`
+- [x] **4.2** Add pairing function in `wine_analyzer.py`
   ```python
   def get_wine_pairing(wines, food_description, occasion="casual", max_price=None):
       # Format wines as context
@@ -238,7 +228,7 @@ Future implementation plan for self-hosting with multi-user support and wine pai
       pass
   ```
 
-- [ ] **4.3** Add API endpoint in `app.py`
+- [x] **4.3** Add API endpoint in `app.py`
   ```python
   @app.route("/api/pair", methods=["POST"])
   def pair_wine():
@@ -252,7 +242,7 @@ Future implementation plan for self-hosting with multi-user support and wine pai
       return jsonify(suggestions)
   ```
 
-- [ ] **4.4** Add pairing UI in `index.html`
+- [x] **4.4** Add pairing UI in `index.html`
   ```html
   <div id="pairing-section">
       <h3>Wine Pairing</h3>
@@ -267,7 +257,7 @@ Future implementation plan for self-hosting with multi-user support and wine pai
   </div>
   ```
 
-- [ ] **4.5** Add pairing JavaScript in `app.js`
+- [x] **4.5** Add pairing JavaScript in `app.js`
   ```javascript
   async function getPairing() {
       const food = document.getElementById('food-input').value;
@@ -284,7 +274,7 @@ Future implementation plan for self-hosting with multi-user support and wine pai
   }
   ```
 
-- [ ] **4.6** Smart occasion-based price filtering
+- [x] **4.6** Smart occasion-based price filtering
   ```python
   OCCASION_PRICE_LIMITS = {
       "casual": 30,      # Max $30 for casual
